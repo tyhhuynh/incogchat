@@ -1,0 +1,11 @@
+.git
+.gitignore
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+node_modules/
+Dockerfile
+render.yaml
+*.md
+*.log

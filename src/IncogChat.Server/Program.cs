@@ -79,8 +79,8 @@ app.UseRateLimiter();
 // root
 app.MapGet("/", () => Results.Ok(new { ok = true, service = "IncogChat API" }));
 
-// Health
-app.MapGet("/health", () => Results.Ok(new { ok = true })).RequireCors("portfolio");
+// health check endpoint for Render
+app.MapGet("/health", () => Results.Ok(new { ok = true }))
 
 // POST /rooms -> { passcode: "########" }
 app.MapPost("/rooms", (RoomRegistry reg) =>

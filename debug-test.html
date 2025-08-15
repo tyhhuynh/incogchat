@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Debug Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.0/signalr.min.js"></script>
+  </head>
+  <body>
+    <h1>Debug Test</h1>
+    <div id="status">Disconnected</div>
+    <button onclick="connect()">Connect</button>
+    <div>
+      <input
+        type="text"
+        id="hostName"
+        placeholder="Host name (optional)"
+        value="TestHost"
+      />
+      <button onclick="createRoom()" id="createBtn" disabled>
+        Create Room
+      </button>
+    </div>
+    <div id="output"></div>
+
+    <script>
+      let connection = null;
+
+      function log(message) {
+        const output = document.getElementById("output");
+        output.innerHTML +=
+          "<div>" + new Date().toLocaleTimeString() + ": " + message + "</div>";
+        console.log(message);
+      }
+
+      async function connect() {
+        try {
+          log("Connecting...");
+          document.getElementById("status").textContent = "Connecting...";
+
+          connection = new signalR.HubConnectionBuilder()
+            .withUrl("http://localhost:8080/hubs/chat")
+            .build();
+
+          await connection.start();
+          document.getElementById("status").textContent = "Connected";
+          document.getElementById("createBtn").disabled = false;
+          log("Connected successfully");
+        } catch (err) {
+          log("Connection failed: " + err.message);
+          console.error(err);
+        }
+      }
+
+      async function createRoom() {
+        try {
+          const hostName = document.getElementById("hostName").value.trim();
+          log(
+            "Creating room with host name: " + (hostName || "auto-generated")
+          );
+          const passcode = await connection.invoke(
+            "CreateRoom",
+            hostName || null
+          );
+          log("Room created with passcode: " + passcode);
+        } catch (err) {
+          log("Failed to create room: " + err.message);
+          console.error(err);
+        }
+      }
+    </script>
+  </body>
+</html>

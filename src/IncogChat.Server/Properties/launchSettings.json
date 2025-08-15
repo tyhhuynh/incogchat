@@ -1,0 +1,15 @@
+﻿{
+  "profiles": {
+    "IncogChat.Server": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:8080",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "PORTFOLIO_ORIGIN": "http://localhost:3000",
+        "USER_IDLE_MINUTES": "5",
+        "ROOM_TTL_MINUTES": "10",
+        "PORT": "8080"
+      }
+    }
+  }
+}

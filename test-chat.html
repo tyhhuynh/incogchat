@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IncogChat Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.0/signalr.min.js"></script>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .status {
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        font-weight: bold;
+      }
+      .status.connected {
+        background: #d4edda;
+        color: #155724;
+      }
+      .status.disconnected {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .status.connecting {
+        background: #fff3cd;
+        color: #856404;
+      }
+
+      .section {
+        margin-bottom: 30px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input,
+      button {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        margin-right: 10px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+      }
+
+      .chat-area {
+        height: 300px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 10px;
+        overflow-y: auto;
+        background: #f8f9fa;
+        margin-bottom: 10px;
+      }
+
+      .message {
+        margin-bottom: 8px;
+        padding: 8px;
+        border-radius: 4px;
+        background: white;
+      }
+      .message .name {
+        font-weight: bold;
+        color: #007bff;
+      }
+      .message .time {
+        font-size: 12px;
+        color: #6c757d;
+      }
+      .message .text {
+        margin-top: 4px;
+      }
+
+      .participants {
+        background: #e9ecef;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+      }
+      .participants strong {
+        color: #495057;
+      }
+
+      .system-message {
+        background: #fff3cd;
+        color: #856404;
+        padding: 8px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+      }
+
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 8px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+      }
+
+      .role-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: bold;
+        margin-left: 8px;
+      }
+      .role-badge.host {
+        background: #28a745;
+        color: white;
+      }
+      .role-badge.participant {
+        background: #6c757d;
+        color: white;
+      }
+
+      .connection-info {
+        background: #e3f2fd;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+        border-left: 4px solid #2196f3;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>IncogChat Test Client</h1>
+
+      <div id="status" class="status disconnected">Disconnected</div>
+
+      <!-- Connection Section -->
+      <div class="section">
+        <h3>Connection</h3>
+        <button id="connectBtn" onclick="connect()">Connect to Server</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>
+          Disconnect
+        </button>
+      </div>
+
+      <!-- Room Management -->
+      <div class="section">
+        <h3>Room Management</h3>
+
+        <!-- Host Name Input (only visible when connected but not in room) -->
+        <div id="hostNameSection" class="form-group hidden">
+          <label for="hostName">Your Display Name (as Host):</label>
+          <input
+            type="text"
+            id="hostName"
+            placeholder="Enter your display name"
+            value="Host"
+          />
+        </div>
+
+        <div class="form-group">
+          <button id="createRoomBtn" onclick="createRoom()" disabled>
+            Create New Room
+          </button>
+          <span id="roomCode"></span>
+        </div>
+
+        <div class="form-group">
+          <label for="joinPasscode">Join Room (Passcode):</label>
+          <input
+            type="text"
+            id="joinPasscode"
+            placeholder="Enter 8-digit passcode"
+          />
+          <input
+            type="text"
+            id="displayName"
+            placeholder="Your display name"
+            value="TestUser"
+          />
+          <button id="joinRoomBtn" onclick="joinRoom()" disabled>
+            Join Room
+          </button>
+        </div>
+      </div>
+
+      <!-- Connection Info -->
+      <div id="connectionInfo" class="connection-info hidden">
+        <strong>Connected as:</strong> <span id="userDisplayName"></span>
+        <span id="userRole" class="role-badge"></span>
+        <br />
+        <strong>Room:</strong> <span id="currentRoom"></span>
+      </div>
+
+      <!-- Chat Area -->
+      <div class="section">
+        <h3>Chat</h3>
+        <div id="participants" class="participants" style="display: none">
+          <strong>Participants:</strong> <span id="participantsList"></span>
+        </div>
+
+        <div id="chatArea" class="chat-area"></div>
+
+        <div class="form-group">
+          <input
+            type="text"
+            id="messageInput"
+            placeholder="Type your message..."
+            disabled
+          />
+          <button id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+          <button id="endRoomBtn" onclick="endRoom()" disabled>
+            End Room (Host Only)
+          </button>
+        </div>
+      </div>
+
+      <!-- Log (Host Only) -->
+      <div id="logSection" class="section hidden">
+        <h3>Event Log (Host Only)</h3>
+        <div
+          id="log"
+          style="
+            height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+          "
+        ></div>
+      </div>
+    </div>
+
+    <script>
+      let connection = null;
+      let currentPasscode = null;
+      let isOwner = false;
+      let userDisplayName = null;
+      let isConnected = false;
+
+      function log(message, type = "info") {
+        // Show log for all users, but only hosts see the log section
+        const logDiv = document.getElementById("log");
+        if (logDiv) {
+          const timestamp = new Date().toLocaleTimeString();
+          const logEntry = document.createElement("div");
+          logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+          if (type === "error") logEntry.style.color = "red";
+          if (type === "success") logEntry.style.color = "green";
+          logDiv.appendChild(logEntry);
+          logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Also show errors as alerts for non-hosts
+        if (type === "error" && !isOwner) {
+          alert(message);
+        }
+      }
+
+      function updateStatus(status, className) {
+        const statusDiv = document.getElementById("status");
+        statusDiv.textContent = status;
+        statusDiv.className = `status ${className}`;
+      }
+
+      function updateButtons() {
+        const connected = connection && connection.state === "Connected";
+        document.getElementById("connectBtn").disabled = connected;
+        document.getElementById("disconnectBtn").disabled = !connected;
+
+        // Show host name input when connected but not in a room
+        const hostNameSection = document.getElementById("hostNameSection");
+        if (connected && !isConnected) {
+          hostNameSection.classList.remove("hidden");
+        } else {
+          hostNameSection.classList.add("hidden");
+        }
+
+        // Only allow room creation if not already in a room
+        document.getElementById("createRoomBtn").disabled =
+          !connected || isConnected;
+
+        // Only allow joining if not already connected to a room
+        document.getElementById("joinRoomBtn").disabled =
+          !connected || isConnected;
+        document.getElementById("joinPasscode").disabled = isConnected;
+        document.getElementById("displayName").disabled = isConnected;
+
+        const inRoom = currentPasscode !== null;
+        document.getElementById("messageInput").disabled = !inRoom;
+        document.getElementById("sendBtn").disabled = !inRoom;
+        document.getElementById("endRoomBtn").disabled = !inRoom || !isOwner;
+      }
+
+      function updateConnectionInfo() {
+        const infoDiv = document.getElementById("connectionInfo");
+        const nameSpan = document.getElementById("userDisplayName");
+        const roleSpan = document.getElementById("userRole");
+        const roomSpan = document.getElementById("currentRoom");
+        const logSection = document.getElementById("logSection");
+
+        if (isConnected && userDisplayName) {
+          infoDiv.classList.remove("hidden");
+          nameSpan.textContent = userDisplayName;
+          roleSpan.textContent = isOwner ? "Host" : "Participant";
+          roleSpan.className = `role-badge ${isOwner ? "host" : "participant"}`;
+          roomSpan.textContent = currentPasscode;
+
+          // Show log only for host
+          if (isOwner) {
+            logSection.classList.remove("hidden");
+          } else {
+            logSection.classList.add("hidden");
+          }
+        } else {
+          infoDiv.classList.add("hidden");
+          logSection.classList.add("hidden");
+        }
+      }
+
+      function resetState() {
+        currentPasscode = null;
+        isOwner = false;
+        userDisplayName = null;
+        isConnected = false;
+
+        // Clear UI
+        document.getElementById("roomCode").textContent = "";
+        document.getElementById("chatArea").innerHTML = "";
+        document.getElementById("participants").style.display = "none";
+        document.getElementById("joinPasscode").value = "";
+        document.getElementById("displayName").value = "TestUser";
+        document.getElementById("hostName").value = "Host";
+
+        updateButtons();
+        updateConnectionInfo();
+      }
+
+      async function connect() {
+        try {
+          updateStatus("Connecting...", "connecting");
+          log("Connecting to server...");
+
+          connection = new signalR.HubConnectionBuilder()
+            .withUrl("http://localhost:8080/hubs/chat")
+            .withAutomaticReconnect()
+            .build();
+
+          // Set up event handlers
+          connection.on("ReceiveMessage", (message) => {
+            addMessage(message.displayName, message.text, message.utc);
+            log(
+              `Message received from ${message.displayName}: ${message.text}`
+            );
+          });
+
+          connection.on("UserJoined", (data) => {
+            addSystemMessage(`${data.displayName} joined the room`);
+            updateParticipants(data.participants);
+            log(`User joined: ${data.displayName}`);
+          });
+
+          connection.on("UserLeft", (data) => {
+            addSystemMessage(`${data.displayName} left the room`);
+            updateParticipants(data.participants);
+            log(`User left: ${data.displayName}`);
+          });
+
+          connection.on("PresenceList", (data) => {
+            updateParticipants(data.participants);
+            log(`Participants updated: ${data.participants.join(", ")}`);
+          });
+
+          connection.on("RoomClosed", () => {
+            addSystemMessage("Room was closed by the host");
+            resetState();
+            log("Room closed by host");
+          });
+
+          connection.on("KickedForInactivity", () => {
+            addSystemMessage("You were kicked for inactivity");
+            resetState();
+            log("Kicked for inactivity");
+          });
+
+          await connection.start();
+          updateStatus("Connected", "connected");
+          log("Successfully connected to server", "success");
+          updateButtons();
+        } catch (err) {
+          updateStatus("Connection Failed", "disconnected");
+          log(`Connection failed: ${err.message}`, "error");
+          console.error(err);
+        }
+      }
+
+      async function disconnect() {
+        if (connection) {
+          await connection.stop();
+          connection = null;
+          resetState();
+          updateStatus("Disconnected", "disconnected");
+          updateButtons();
+        }
+      }
+
+      async function createRoom() {
+        const hostName = document.getElementById("hostName").value.trim();
+
+        if (!hostName) {
+          log("Please enter a display name", "error");
+          return;
+        }
+
+        try {
+          const passcode = await connection.invoke("CreateRoom", hostName);
+          currentPasscode = passcode;
+          isOwner = true;
+          isConnected = true;
+          userDisplayName = hostName;
+
+          document.getElementById(
+            "roomCode"
+          ).textContent = `Room Code: ${passcode}`;
+          addSystemMessage(`Room created! Code: ${passcode}`);
+          updateButtons();
+          updateConnectionInfo();
+          log(`Room created with code: ${passcode}`, "success");
+        } catch (err) {
+          log(`Failed to create room: ${err.message}`, "error");
+          console.error(err);
+        }
+      }
+
+      async function joinRoom() {
+        const passcode = document.getElementById("joinPasscode").value.trim();
+        const displayName =
+          document.getElementById("displayName").value.trim() || "Anonymous";
+
+        if (!passcode) {
+          if (isOwner) {
+            log("Please enter a passcode", "error");
+          } else {
+            alert("Please enter a passcode");
+          }
+          return;
+        }
+
+        try {
+          const result = await connection.invoke(
+            "JoinRoom",
+            passcode,
+            displayName
+          );
+          if (result.success) {
+            currentPasscode = passcode;
+            isOwner = result.isOwner;
+            isConnected = true;
+            userDisplayName = result.normalizedDisplayName;
+
+            document.getElementById(
+              "roomCode"
+            ).textContent = `Room Code: ${passcode}`;
+            addSystemMessage(
+              `Joined room! You are ${
+                result.isOwner ? "the host" : "a participant"
+              }`
+            );
+            updateButtons();
+            updateConnectionInfo();
+            log(`Joined room ${passcode} as ${displayName}`, "success");
+
+            // Start heartbeat
+            startHeartbeat();
+          } else {
+            if (isOwner) {
+              log("Failed to join room", "error");
+            } else {
+              alert("Failed to join room");
+            }
+          }
+        } catch (err) {
+          const errorMsg = `Failed to join room: ${err.message}`;
+          if (isOwner) {
+            log(errorMsg, "error");
+          } else {
+            alert(errorMsg);
+          }
+          console.error(err);
+        }
+      }
+
+      async function sendMessage() {
+        const messageInput = document.getElementById("messageInput");
+        const text = messageInput.value.trim();
+
+        if (!text || !currentPasscode) return;
+
+        try {
+          await connection.invoke("SendMessage", currentPasscode, text);
+          messageInput.value = "";
+          log(`Message sent: ${text}`);
+        } catch (err) {
+          const errorMsg = `Failed to send message: ${err.message}`;
+          if (isOwner) {
+            log(errorMsg, "error");
+          } else {
+            alert(errorMsg);
+          }
+          console.error(err);
+        }
+      }
+
+      async function endRoom() {
+        if (!currentPasscode || !isOwner) return;
+
+        try {
+          await connection.invoke("EndRoom", currentPasscode);
+          log("Room ended", "success");
+        } catch (err) {
+          log(`Failed to end room: ${err.message}`, "error");
+          console.error(err);
+        }
+      }
+
+      function addMessage(displayName, text, utc) {
+        const chatArea = document.getElementById("chatArea");
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "message";
+
+        const time = new Date(utc).toLocaleTimeString();
+        messageDiv.innerHTML = `
+                <div class="name">${displayName}</div>
+                <div class="time">${time}</div>
+                <div class="text">${text}</div>
+            `;
+
+        chatArea.appendChild(messageDiv);
+        chatArea.scrollTop = chatArea.scrollHeight;
+      }
+
+      function addSystemMessage(text) {
+        const chatArea = document.getElementById("chatArea");
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "system-message";
+        messageDiv.textContent = text;
+        chatArea.appendChild(messageDiv);
+        chatArea.scrollTop = chatArea.scrollHeight;
+      }
+
+      function updateParticipants(participants) {
+        const participantsDiv = document.getElementById("participants");
+        const participantsList = document.getElementById("participantsList");
+
+        if (participants.length === 0) {
+          participantsDiv.style.display = "none";
+        } else {
+          participantsDiv.style.display = "block";
+          participantsList.textContent = participants.join(", ");
+        }
+      }
+
+      function startHeartbeat() {
+        if (!currentPasscode) return;
+
+        setInterval(async () => {
+          if (
+            connection &&
+            connection.state === "Connected" &&
+            currentPasscode
+          ) {
+            try {
+              await connection.invoke("Heartbeat", currentPasscode);
+            } catch (err) {
+              console.error("Heartbeat failed:", err);
+            }
+          }
+        }, 30000); // Every 30 seconds
+      }
+
+      // Handle Enter key in message input
+      document
+        .getElementById("messageInput")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter") {
+            sendMessage();
+          }
+        });
+
+      // Handle Enter key in passcode input
+      document
+        .getElementById("joinPasscode")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter") {
+            joinRoom();
+          }
+        });
+
+      // Handle Enter key in host name input
+      document
+        .getElementById("hostName")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter") {
+            createRoom();
+          }
+        });
+
+      // Initial button state
+      updateButtons();
+      log('Test client loaded. Click "Connect to Server" to begin.');
+    </script>
+  </body>
+</html>

@@ -1,12 +1,13 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 using IncogChat.Server.Core;
 using IncogChat.Server.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Serilog (no PII)
+// Serilog
 builder.Host.UseSerilog((ctx, cfg) =>
 {
     cfg.ReadFrom.Configuration(ctx.Configuration)
@@ -14,7 +15,7 @@ builder.Host.UseSerilog((ctx, cfg) =>
        .WriteTo.Console();
 });
 
-// CORS allow-list (single origin)
+// CORS allow-list 
 var portfolioOrigin = Environment.GetEnvironmentVariable("PORTFOLIO_ORIGIN")
                     ?? builder.Configuration["PORTFOLIO_ORIGIN"]
                     ?? "https://example.com";
@@ -24,11 +25,10 @@ builder.Services.AddCors(options =>
     options.AddPolicy("portfolio", p =>
         p.WithOrigins(portfolioOrigin)
          .AllowAnyHeader()
-         .AllowCredentials()
-         .WithMethods("GET", "POST"));
+         .AllowAnyMethod()
+         .AllowCredentials());
 });
 
-// SignalR
 builder.Services.AddSignalR();
 
 // In-memory state
@@ -76,9 +76,11 @@ app.UseRouting();
 app.UseCors("portfolio");
 app.UseRateLimiter();
 
+// root
+app.MapGet("/", () => Results.Ok(new { ok = true, service = "IncogChat API" }));
+
 // Health
-app.MapGet("/health", () => Results.Ok(new { ok = true }))
-   .RequireCors("portfolio");
+app.MapGet("/health", () => Results.Ok(new { ok = true })).RequireCors("portfolio");
 
 // POST /rooms -> { passcode: "########" }
 app.MapPost("/rooms", (RoomRegistry reg) =>
@@ -95,7 +97,7 @@ app.MapPost("/rooms", (RoomRegistry reg) =>
 app.MapHub<ChatHub>("/hubs/chat").RequireCors("portfolio");
 
 // Bind port
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-app.Urls.Add($"http://0.0.0.0:{port}");
+// var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+// app.Urls.Add($"http://0.0.0.0:{port}");
 
 app.Run();

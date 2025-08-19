@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
+using System.Linq;
 using Serilog;
 using IncogChat.Server.Core;
 using IncogChat.Server.Hubs;
@@ -16,14 +17,27 @@ builder.Host.UseSerilog((ctx, cfg) =>
 });
 
 // CORS allow-list 
-var portfolioOrigin = Environment.GetEnvironmentVariable("PORTFOLIO_ORIGIN")
-                    ?? builder.Configuration["PORTFOLIO_ORIGIN"]
-                    ?? "https://example.com";
+var allowedOrigins = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS")?.Split(',')
+                    ?? builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
+                    ?? new[]
+                    {
+                        "https://tyhh.dev",
+                        "https://www.tyhh.dev",
+                        "http://localhost:3000" // dev only
+                    };
+
+// validate origins
+if (allowedOrigins.Any(string.IsNullOrWhiteSpace)) 
+{
+    throw new InvalidOperationException("Invalid CORS origin detected");
+}
+
+Log.Information("CORS origin configured: {Origins}", string.Join(", ", allowedOrigins));
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("portfolio", p =>
-        p.WithOrigins(portfolioOrigin)
+        p.WithOrigins(allowedOrigins)
          .AllowAnyHeader()
          .AllowAnyMethod()
          .AllowCredentials());
